@@ -1,173 +1,233 @@
 # KB Support Agent
 
-AI-powered support agent with function/tool calling capabilities. Searches knowledge base for answers and creates tickets when needed.
+AI-powered support assistant with knowledge base search and ticket creation capabilities.
 
-## Technical Overview
+## Overview
 
-- **Backend**: FastAPI, endpoint `POST /chat`, tool calling через OpenAI Chat Completions API
-- **Tools**: 
-  - `search_kb(query, limit)` — keyword-based search (word matching + scoring, RU→EN mapping)
-  - `create_ticket(title, description, priority)` — MVP stub для создания тикетов
-- **Observability**: `runs.db` (SQLite) — логирование tool calls (args/results) + финальный ответ для отладки/QA
-- **KB**: `kb_seed.json` — 5 статей (Password reset, Payment failed, API rate limits, Account deletion, Two-factor authentication)
+This project implements an AI agent that helps users find answers in a knowledge base and creates support tickets when needed. It uses OpenAI's function calling API to interact with tools (`search_kb` and `create_ticket`) and provides a modern web interface for user interaction.
 
 ## Features
 
-- **Knowledge Base Search**: Search internal KB articles using `search_kb` tool
-- **Ticket Creation**: Automatically create support tickets via `create_ticket` tool when KB doesn't have answers
-- **Run Logging**: All tool calls, inputs, and outputs are logged to SQLite for debugging and QA
-- **OpenAI Function Calling**: Uses Chat Completions API with tool calling for reliable function execution
+- **Knowledge Base Search**: Search through internal knowledge base articles using keyword matching with scoring
+- **Ticket Creation**: Automatically create support tickets when KB doesn't contain relevant information
+- **Multilingual Support**: Basic Russian-to-English translation for keyword-based search
+- **Web Interface**: Modern, responsive web UI with dark theme
+- **Chat History**: View conversation history and thread management
+- **Observability**: Logging of all tool calls and responses for debugging and QA
 
-## Setup
+## Architecture
 
-1. **Create virtual environment**:
-```bash
-python -m venv .venv
-source .venv/bin/activate  # mac/linux
-# или
-.venv\Scripts\activate  # windows
+### Backend
+- **Framework**: FastAPI
+- **AI Model**: OpenAI GPT (Chat Completions API)
+- **Database**: SQLite for logging agent runs
+- **Tools**: Function calling for `search_kb` and `create_ticket`
+
+### Frontend
+- **Technology**: Vanilla HTML, CSS, JavaScript
+- **Design**: Dark theme with purple/blue accents
+- **Responsive**: Mobile-friendly with hamburger menu
+
+### Data Flow
+
+1. **Retrieval**: User query → KB search → Relevant articles returned
+2. **Generation**: Model receives KB results → Generates answer in user's language
+3. **Fallback**: If no KB found → Model creates ticket via `create_ticket` tool
+
+## Project Structure
+
+```
+agent/
+├── main.py                 # FastAPI backend, agent orchestration
+├── kb_seed.json            # Knowledge base (5 articles)
+├── runs.db                 # SQLite database for logging
+├── requirements.txt        # Python dependencies
+├── .gitignore             # Git ignore rules
+├── README.md              # This file
+├── static/                # Frontend files
+│   ├── index.html         # Main HTML
+│   ├── style.css          # Styles
+│   ├── script.js          # Frontend logic
+│   └── *.png, *.webp      # Icons and images
+├── view_history.py        # Utility to view runs.db
+└── test_example.sh        # API test script
 ```
 
-2. **Install dependencies**:
+## Installation
+
+1. **Clone the repository**:
+```bash
+git clone https://github.com/Leeesenka/IA-Agent.git
+cd IA-Agent
+```
+
+2. **Create virtual environment**:
+```bash
+python -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+```
+
+3. **Install dependencies**:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. **Configure environment**:
-```bash
-# Создайте файл .env и добавьте ваш OPENAI_API_KEY:
-echo "OPENAI_API_KEY=your_api_key_here" > .env
-# Или отредактируйте .env вручную
+4. **Set up environment variables**:
+Create a `.env` file in the project root:
+```env
+OPENAI_API_KEY=your_openai_api_key_here
 ```
 
-4. **Run server**:
+5. **Initialize database**:
+The database will be created automatically on first run.
+
+## Usage
+
+### Running the Server
+
 ```bash
 uvicorn main:app --reload --port 8000
 ```
 
-5. **Open in browser**:
-   - Web Interface: http://127.0.0.1:8000
-   - API Documentation: http://127.0.0.1:8000/docs
+The web interface will be available at `http://localhost:8000`
 
-## Usage
+### API Endpoints
 
-### Web Interface
+- `GET /` - Web interface
+- `POST /chat` - Chat endpoint (message, thread_id)
+- `POST /create-ticket` - Manual ticket creation
+- `GET /history` - Get conversation history
+- `GET /threads` - List all thread IDs
 
-Откройте http://127.0.0.1:8000 в браузере для использования веб-интерфейса. Интерфейс включает:
-- Чат с AI-ассистентом
-- Отображение истории сообщений
-- Управление thread ID
-- Статус запросов
-
-### API Endpoint
+### Example API Request
 
 ```bash
 curl -X POST http://127.0.0.1:8000/chat \
   -H "Content-Type: application/json" \
   -d '{
-    "message": "У пользователя логин через Google. Как ему сменить пароль?",
-    "thread_id": "t1"
+    "message": "How do I reset my password?",
+    "thread_id": "demo-thread"
   }'
 ```
 
-### Example Response
+### Viewing History
 
-```json
-{
-  "answer": "Based on the knowledge base, if a user signed up with Google OAuth, password reset is not available. They should use Google sign-in instead.\n\nSources:\n- https://kb.local/password-reset\n\nNext steps: If the user needs to change their Google account password, they should do so through their Google account settings."
-}
+```bash
+python view_history.py
 ```
 
-## Project Structure
+## Knowledge Base
 
-- `main.py` - FastAPI server with agent logic and tool implementations
-- `kb_seed.json` - **База знаний** (knowledge base) — 5 статей с информацией для ответов
-- `runs.db` - **Логи/трассировка** (SQLite) — логирование per tool invocation (одна запись на каждый tool call: args/results) + финальный ответ (создается автоматически)
-- `.env` - Environment variables (not in git)
-- `static/` - Web interface files
-  - `index.html` - Main HTML page
-  - `style.css` - Styles
-  - `script.js` - Frontend JavaScript
+The knowledge base (`kb_seed.json`) contains 5 articles:
+- Password reset
+- Payment failed
+- API rate limits
+- Account deletion
+- Two-factor authentication
+
+Each article has:
+- `id`: Unique identifier
+- `title`: Article title
+- `content`: Article content
+- `url`: Link to full article
 
 ## How It Works
 
-### Откуда берутся данные
+### Search Algorithm
 
-Данные для ответа берутся из базы знаний `kb_seed.json`.
+1. **Query Normalization**: Lowercase, strip whitespace
+2. **Word Matching**: Split query into words, match against KB content
+3. **Scoring**: 
+   - Base score: word matches in content
+   - Bonus: matches in title
+   - Match ratio calculation
+4. **Translation**: Basic RU→EN keyword mapping for multilingual support
+5. **Filtering**: Results filtered by score threshold (≥2.5) and limited to top 2
 
-**Процесс:**
+### Agent Logic
 
-1. **Retrieval (поиск)**
-   - Модель GPT решает, нужно ли вызвать tool `search_kb(query)` на основе запроса пользователя
-   - Приложение выполняет функцию `search_kb()` и возвращает список релевантных статей (title/snippet/url)
-   - *Примечание: Keyword-based search (word matching + scoring) with basic RU→EN mapping (MVP). Для продакшена рекомендуется RAG с embeddings*
+1. **Mandatory Retrieval**: Always performs `search_kb()` first
+2. **Dynamic Tool Control**: 
+   - If KB found with good score → Tools disabled (model cannot create ticket)
+   - If KB not found or low score → Tools enabled (model can create ticket)
+3. **Response Generation**: Model generates structured response with:
+   - Answer summary
+   - Steps from KB
+   - Clarifying questions (if needed)
+   - Sources (KB URLs)
+   - Next steps
+   - Confidence level
+   - Ticket info (if created)
 
-2. **Generation (формирование ответа)**
-   - Модель получает найденные материалы из KB и генерирует ответ на языке пользователя
-   - Ответ включает ссылки на источники из базы знаний
+### Confidence Scoring
 
-3. **Fallback**
-   - Если релевантной информации нет, модель вызывает tool `create_ticket(...)` для создания тикета поддержки
+- **High**: KB found with score > 0.6
+- **Medium**: KB found with score ≥ 0.3
+- **Low**: No KB found or score < 0.3
 
-**Где что хранится:**
-- **База знаний**: `kb_seed.json` — статьи с информацией для ответов
-- **Логи/трассировка**: `runs.db` (SQLite) — логирование per tool invocation (одна запись на каждый tool call: args/results) + финальный ответ для observability и отладки
+## Configuration
 
-### Технические детали
+### Environment Variables
 
-- **Tool Calling**: Модель GPT сама решает, когда вызывать tools через OpenAI Function Calling API
-- **Поиск**: Keyword-based search (word matching + scoring) with basic RU→EN mapping (MVP). Для мультиязычности и семантического поиска рекомендуется использовать embeddings/RAG
-- **Логирование**: Все вызовы tools логируются в `runs.db` (одна запись на каждый tool invocation) для отладки и анализа качества ответов
+- `OPENAI_API_KEY`: Your OpenAI API key (required)
 
-## Tools
+### Constants in `main.py`
 
-### `search_kb(query, limit=3)`
-Tool для поиска в базе знаний. Модель вызывает его через tool calling, когда нужно найти информацию. Возвращает топ совпадений с заголовками, сниппетами и URL.
+- `KB_SCORE_THRESHOLD_RAW = 2.5`: Minimum score for KB results
+- `MAX_KB_RESULTS = 2`: Maximum KB results to return
+- Model: `gpt-4o-mini` (configurable)
 
-**Реализация (MVP)**: Keyword-based search (word matching + scoring) с базовым RU→EN mapping. Для продакшена рекомендуется заменить на semantic search с embeddings.
+## Development
 
-### `create_ticket(title, description, priority="P2")`
-Tool для создания тикета поддержки. Модель вызывает его, когда не может найти релевантную информацию в KB. Возвращает ticket ID и статус.
-
-## Checking Logs / Tracing
-
-Все вызовы tools логируются в SQLite базу (`runs.db`) для observability и отладки. Это не хранилище знаний, а трассировка выполнения. Логирование идет per tool invocation (одна запись на каждый tool call: args/results) + финальный ответ.
-
-### Просмотр истории через SQLite:
-
-```bash
-# Последние 10 записей с форматированием
-sqlite3 runs.db -header -column "SELECT id, thread_id, user_message, tool_name, substr(final_answer, 1, 100) as answer_preview FROM runs ORDER BY id DESC LIMIT 10;"
-
-# История конкретного thread
-sqlite3 runs.db "SELECT * FROM runs WHERE thread_id='demo-thread' ORDER BY id DESC;"
-```
-
-### Просмотр истории через Python скрипт:
+### Testing
 
 ```bash
-# Показать все thread ID
-python3 view_history.py --threads
+# Test API endpoint
+bash test_example.sh
 
-# Последние 10 записей
-python3 view_history.py 10
-
-# История конкретного thread (последние 20 записей)
-python3 view_history.py --thread=demo-thread 20
+# View database contents
+python view_history.py
 ```
 
-Скрипт `view_history.py` показывает полную информацию: вопрос, вызванный tool, аргументы, результаты и финальный ответ.
+### Adding KB Articles
+
+Edit `kb_seed.json` and add new articles following the existing format:
+
+```json
+{
+  "id": "article_id",
+  "title": "Article Title",
+  "content": "Article content here...",
+  "url": "https://kb.local/article-url"
+}
+```
 
 ## Future Improvements
 
-1. **RAG/Embeddings**: Заменить keyword-based search на semantic search с embeddings для мультиязычности и лучшей релевантности
-2. **Translation Layer**: Расширить RU→EN mapping / заменить на полноценный переводчик или embeddings-based multilingual retrieval
-3. **Cyclic Tool Loop**: Уже реализовано — поддержка нескольких раундов tool calling до получения финального ответа
-4. **Evaluation Cases**: Добавить `eval_cases.json` с 10-20 тестовыми сценариями для оценки качества
-5. **Tracing**: Интегрировать Agents SDK для нативной поддержки трассировки
+- [ ] Replace keyword search with embeddings/RAG for semantic search
+- [ ] Implement proper multilingual translation (not just keyword mapping)
+- [ ] Add authentication and user management
+- [ ] Integrate with real ticket system (Jira, Linear, Zendesk)
+- [ ] Add evaluation test cases
+- [ ] Implement proper error handling and retries
+- [ ] Add rate limiting
+- [ ] Deploy to production (Railway, Render, etc.)
 
-## Resume Bullets
+## Tech Stack
 
-- Built an AI agent with function/tool calling to retrieve answers from a knowledge base and create tickets when confidence is low
-- Implemented run logging (tool calls, inputs/outputs) for debugging and QA; prepared evaluation scenarios to reduce hallucinations
+- **Backend**: Python 3.8+, FastAPI, OpenAI API
+- **Frontend**: HTML5, CSS3, Vanilla JavaScript
+- **Database**: SQLite
+- **Deployment**: Ready for Railway, Render, Fly.io, etc.
 
+## License
+
+This project is open source and available for educational purposes.
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Author
+
+Built as a portfolio project demonstrating AI agents with function calling capabilities.
