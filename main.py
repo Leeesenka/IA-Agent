@@ -77,18 +77,18 @@ def load_kb() -> List[Dict[str, str]]:
 
 def search_kb(query: str, limit: int = 3) -> List[Dict[str, str]]:
     # Keyword-based search (word matching + scoring) with basic RU→EN mapping (MVP).
-    # Для продакшена рекомендуется заменить на semantic search с embeddings/RAG.
+    # For production, it's recommended to replace with semantic search using embeddings/RAG.
     kb = load_kb()
     
-    # Простой словарь переводов ключевых слов (RU -> EN)
-    # Это позволяет находить статьи на английском по русским запросам
-    # Примечание: слова короче 3 символов фильтруются, поэтому короткие слова не добавляем
+    # Simple keyword translation dictionary (RU -> EN)
+    # This allows finding English articles from Russian queries
+    # Note: words shorter than 3 characters are filtered, so we don't add short words
     translations = {
         'пароль': 'password',
         'сброс': 'reset',
         'платеж': 'payment',
         'оплата': 'payment',
-        'не прошел': 'failed',  # Фраза целиком, а не отдельные слова
+        'не прошел': 'failed',  # Phrase as a whole, not individual words
         'удаление': 'deletion',
         'аккаунт': 'account',
         'двухфакторная': 'two',
@@ -99,25 +99,25 @@ def search_kb(query: str, limit: int = 3) -> List[Dict[str, str]]:
         'api': 'api',
     }
     
-    # Нормализуем запрос: убираем знаки препинания, приводим к нижнему регистру
+    # Normalize query: remove punctuation, convert to lowercase
     query_normalized = re.sub(r'[^\w\s]', ' ', query.lower())
     query_words_raw = [w.strip() for w in query_normalized.split() if len(w.strip()) > 2]
     
-    # Переводим слова из русского в английский
+    # Translate words from Russian to English
     query_words = []
     for word in query_words_raw:
-        # Проверяем переводы отдельных слов
+        # Check translations for individual words
         if word in translations:
             query_words.append(translations[word])
         else:
-            # Также добавляем оригинальное слово (на случай если оно уже на английском)
+            # Also add original word (in case it's already in English)
             query_words.append(word)
     
-    # Проверяем фразы (например, "двухфакторная аутентификация")
+    # Check phrases (e.g., "двухфакторная аутентификация")
     query_lower = query.lower()
     for phrase_ru, phrase_en in translations.items():
         if len(phrase_ru.split()) > 1 and phrase_ru in query_lower:
-            # Добавляем переведенную фразу как отдельные слова
+            # Add translated phrase as separate words
             query_words.extend(phrase_en.split())
     
     if not query_words:
@@ -125,39 +125,39 @@ def search_kb(query: str, limit: int = 3) -> List[Dict[str, str]]:
     
     scored = []
     for item in kb:
-        # Объединяем title и content для поиска
+        # Combine title and content for search
         text = (item["title"] + " " + item["content"]).lower()
         
-        # Подсчитываем совпадения каждого слова из запроса
+        # Count matches for each word in the query
         score = 0
         matched_words = 0
         
         for word in query_words:
-            # Ищем слово как отдельное слово (с границами слов), а не как подстроку
+            # Search word as a whole word (with word boundaries), not as substring
             word_pattern = r'\b' + re.escape(word) + r'\b'
             matches = len(re.findall(word_pattern, text))
             if matches > 0:
-                score += matches * 2  # Бонус за точное совпадение слова
+                score += matches * 2  # Bonus for exact word match
                 matched_words += 1
             else:
-                # Если точного совпадения нет, ищем как подстроку (для частичных совпадений)
+                # If no exact match, search as substring (for partial matches)
                 if word in text:
                     score += 1
         
-        # Бонус за совпадение в title (важнее, чем в content)
+        # Bonus for match in title (more important than in content)
         title_lower = item["title"].lower()
         for word in query_words:
             if word in title_lower:
                 score += 3
         
-        # Добавляем только если найдено хотя бы одно совпадение
+        # Add only if at least one match found
         if score > 0:
-            # Нормализуем score: учитываем процент совпавших слов
+            # Normalize score: consider percentage of matched words
             match_ratio = matched_words / len(query_words) if query_words else 0
-            final_score = score * (1 + match_ratio)  # Бонус за большее количество совпавших слов
+            final_score = score * (1 + match_ratio)  # Bonus for more matched words
             scored.append((final_score, item))
     
-    # Сортируем по убыванию score
+    # Sort by descending score
     scored.sort(key=lambda x: x[0], reverse=True)
     
     results = []
@@ -168,24 +168,24 @@ def search_kb(query: str, limit: int = 3) -> List[Dict[str, str]]:
                 "title": it["title"],
                 "snippet": it["content"][:220] + ("..." if len(it["content"]) > 220 else ""),
                 "url": it["url"],
-                "score": score,  # Сохраняем score для использования в confidence
+                "score": score,  # Save score for use in confidence calculation
             }
         )
     return results
 
 
 def create_ticket(title: str, description: str, priority: str = "P2") -> Dict[str, str]:
-    # MVP: просто "фейковый" тикет id. В реальном проекте подключишь Jira/Linear/Zendesk API.
+    # MVP: just a "fake" ticket id. In a real project, integrate with Jira/Linear/Zendesk API.
     ticket_id = f"TCK-{abs(hash(title + description)) % 100000:05d}"
     return {"ticket_id": ticket_id, "status": "created", "priority": priority}
 
 
 def calculate_relevance_score(query: str, kb_item: Optional[Dict]) -> float:
-    """Вычисляет relevance score для KB результата (0-1)"""
+    """Calculates relevance score for KB result (0-1)"""
     if not kb_item:
         return 0.0
     
-    # Простой расчет на основе совпадений ключевых слов
+    # Simple calculation based on keyword matches
     query_words = set(re.findall(r'\b\w+\b', query.lower()))
     item_text = (kb_item.get('title', '') + ' ' + kb_item.get('snippet', '')).lower()
     item_words = set(re.findall(r'\b\w+\b', item_text))
@@ -193,11 +193,11 @@ def calculate_relevance_score(query: str, kb_item: Optional[Dict]) -> float:
     if not query_words:
         return 0.0
     
-    # Процент совпавших слов
+    # Percentage of matched words
     common_words = query_words.intersection(item_words)
     match_ratio = len(common_words) / len(query_words) if query_words else 0
     
-    # Бонус если title содержит ключевые слова
+    # Bonus if title contains keywords
     title_bonus = 0.3 if any(word in kb_item.get('title', '').lower() for word in query_words) else 0
     
     score = min(match_ratio + title_bonus, 1.0)
@@ -205,8 +205,8 @@ def calculate_relevance_score(query: str, kb_item: Optional[Dict]) -> float:
 
 
 # ---------- OpenAI tool schemas ----------
-# Примечание: search_kb больше не в TOOLS, так как retrieval теперь обязательный и выполняется в backend
-# Модель получает результаты KB автоматически в промпте
+# Note: search_kb is no longer in TOOLS, as retrieval is now mandatory and performed in backend
+# Model receives KB results automatically in the prompt
 TOOLS = [
     {
         "type": "function",
@@ -257,16 +257,16 @@ def build_structured_response(
     kb_results: Optional[List[Dict]] = None,
     top_score: float = 0.0
 ) -> Dict[str, Any]:
-    """Строит структурированный ответ для API"""
+    """Builds structured response for API"""
     
-    # Используем переданные kb_results или собираем из tool_calls
+    # Use provided kb_results or collect from tool_calls
     if kb_results is None:
         kb_results = []
         for name, args, result in all_tool_calls:
             if name == "search_kb" and isinstance(result, list):
                 kb_results.extend(result)
     
-    # Собираем sources из результатов search_kb
+    # Collect sources from search_kb results
     sources = []
     ticket_info = None
     actions_taken = []
@@ -277,9 +277,9 @@ def build_structured_response(
         if name == "create_ticket" and isinstance(result, dict) and "ticket_id" in result:
             ticket_info = result
     
-    # Формируем sources с relevance на основе позиции и score
+    # Build sources with relevance based on position and score
     for idx, item in enumerate(kb_results):
-        # Определяем relevance на основе позиции и score
+        # Determine relevance based on position and score
         if idx == 0 and top_score > 0.5:
             relevance = "high"
         elif idx == 0 or (idx == 1 and top_score > 0.3):
@@ -293,13 +293,13 @@ def build_structured_response(
             "relevance": relevance
         })
     
-    # Проверяем, является ли ответ уточняющим вопросом
+    # Check if answer is a clarifying question
     is_clarifying = is_clarifying_question(final_answer)
     
-    # Если есть KB sources - генерируем next_steps из KB, а не парсим из текста
-    # Это избегает вытаскивания случайных фраз из ответа модели
+    # If KB sources exist - generate next_steps from KB, don't parse from text
+    # This avoids extracting random phrases from model's response
     if sources and kb_results:
-        # Генерируем next_steps на основе найденной KB статьи
+        # Generate next_steps based on found KB article
         next_steps = []
         kb_id = kb_results[0].get("id", "") if kb_results else ""
         
@@ -334,13 +334,13 @@ def build_structured_response(
                 "Note: data deleted within 30 days"
             ]
         else:
-            # Fallback для других статей
+            # Fallback for other articles
             next_steps = [
                 "Follow the steps provided above",
                 "Check the knowledge base article for details"
             ]
         
-        # Добавляем уточняющий вопрос в конец, если есть
+        # Add clarifying question at the end if needed
         if is_clarifying:
             if kb_id == "pw_reset":
                 next_steps.append("Are you trying to log in, or did you lose access to Google account?")
@@ -351,10 +351,10 @@ def build_structured_response(
             else:
                 next_steps.append("Answer the clarifying question above")
     else:
-        # Если KB не найдена - пытаемся извлечь из текста или генерируем общие
+        # If KB not found - try to extract from text or generate generic ones
         next_steps = extract_next_steps(final_answer)
         
-        # Если не нашли next_steps в ответе, генерируем на основе контекста
+        # If next_steps not found in response, generate based on context
         if not next_steps:
             if ticket_info:
                 next_steps = [
@@ -363,7 +363,7 @@ def build_structured_response(
                     "Contact support if urgent"
                 ]
             elif is_clarifying:
-                # Если нет KB, но есть уточняющий вопрос
+                # If no KB but there's a clarifying question
                 next_steps = [
                     "Answer the clarifying questions above",
                     "Provide more details about your issue",
@@ -376,28 +376,28 @@ def build_structured_response(
                     "Create a support ticket for assistance"
                 ]
     
-    # Определяем confidence на основе retrieval score
+    # Determine confidence based on retrieval score
     confidence = determine_confidence_from_score(top_score, sources, all_tool_calls, final_answer)
     
-    # Формируем краткий answer (убираем sources и next_steps если они есть в тексте)
+    # Build concise answer (remove sources and next_steps if they exist in text)
     clean_answer = clean_answer_text(final_answer)
     
-    # Убираем дубликаты из actions_taken с сохранением порядка
+    # Remove duplicates from actions_taken while preserving order
     actions_unique = []
     for a in actions_taken:
         if a not in actions_unique:
             actions_unique.append(a)
     
-    # Формируем структурированный ответ
+    # Build structured response
     response = {
         "answer": clean_answer,
-        "sources": sources[:2],  # Максимум 2 источника (уже отфильтрованы по релевантности)
-        "next_steps": next_steps[:4],  # Максимум 4 шага
-        "actions_taken": actions_unique,  # Уникальные actions с сохранением порядка
+        "sources": sources[:2],  # Maximum 2 sources (already filtered by relevance)
+        "next_steps": next_steps[:4],  # Maximum 4 steps
+        "actions_taken": actions_unique,  # Unique actions with preserved order
         "confidence": confidence,
     }
     
-    # Добавляем ticket если был создан
+    # Add ticket if it was created
     if ticket_info:
         response["ticket"] = {
             "ticket_id": ticket_info.get("ticket_id"),
@@ -409,73 +409,73 @@ def build_structured_response(
 
 
 def extract_next_steps(text: str) -> List[str]:
-    """Извлекает next steps из текста ответа"""
+    """Extracts next steps from response text"""
     next_steps = []
     
-    # Если это уточняющий вопрос, не извлекаем next_steps из текста
+    # If this is a clarifying question, don't extract next_steps from text
     if is_clarifying_question(text):
         return []
     
-    # Ищем секцию "Next steps:" с bullet list форматом
+    # Look for "Next steps:" section with bullet list format
     patterns = [
-        r"(?:5\.\s*)?Next steps[:\-]?\s*\n((?:[-•]\s*[^\n]+\n?)+)",  # Bullet list после "Next steps:"
-        r"Next steps[:\-]?\s*\n((?:[-•]\s*[^\n]+\n?)+)",  # Просто bullet list
+        r"(?:5\.\s*)?Next steps[:\-]?\s*\n((?:[-•]\s*[^\n]+\n?)+)",  # Bullet list after "Next steps:"
+        r"Next steps[:\-]?\s*\n((?:[-•]\s*[^\n]+\n?)+)",  # Just bullet list
     ]
     
     for pattern in patterns:
         match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
         if match:
             steps_text = match.group(1).strip()
-            # Разбиваем по строкам с маркерами - или •
+            # Split by lines with - or • markers
             lines = re.split(r'\n', steps_text)
             for line in lines:
                 line = line.strip()
-                # Ищем строки начинающиеся с - или •
+                # Look for lines starting with - or •
                 bullet_match = re.match(r'^[-•]\s*(.+)$', line)
                 if bullet_match:
                     step = bullet_match.group(1).strip()
-                    # Фильтруем слишком короткие и вопросы
+                    # Filter out too short ones and questions
                     if len(step) > 10 and not step.endswith('?'):
                         next_steps.append(step)
             if next_steps:
                 break
     
-    # Если не нашли через паттерны, не генерируем next_steps из текста
-    # (лучше пусть будет пусто, чем обрезанные куски)
+    # If not found via patterns, don't generate next_steps from text
+    # (better empty than truncated pieces)
     
     return next_steps[:4]
 
 
 def clean_answer_text(text: str) -> str:
-    """Очищает текст ответа от sources и next_steps, оставляя только основной ответ"""
-    # Убираем секции Sources и Next steps если они есть
+    """Cleans answer text from sources and next_steps, leaving only main answer"""
+    # Remove Sources and Next steps sections if they exist
     text = re.sub(r'\(2\)\s*(?:Sources|Источники)[:\-]?.*?(?=\n\(3\)|\n\n|\Z)', '', text, flags=re.IGNORECASE | re.DOTALL)
     text = re.sub(r'\(3\)\s*(?:Next steps|Следующие шаги)[:\-]?.*', '', text, flags=re.IGNORECASE | re.DOTALL)
     text = re.sub(r'Sources[:\-]?.*?(?=Next steps|\Z)', '', text, flags=re.IGNORECASE | re.DOTALL)
     text = re.sub(r'Next steps[:\-]?.*', '', text, flags=re.IGNORECASE | re.DOTALL)
     
-    # Убираем маркеры "(1) Answer:", "(1)", "(2)", "(3)" если они остались
+    # Remove markers "(1) Answer:", "(1)", "(2)", "(3)" if they remain
     text = re.sub(r'^\(1\)\s*(?:Answer[:\-]?\s*)?', '', text, flags=re.MULTILINE | re.IGNORECASE)
     text = re.sub(r'\n\([123]\)\s*(?:Answer|Sources|Next steps)[:\-]?\s*', '\n', text, flags=re.IGNORECASE)
     text = re.sub(r'\n\([123]\)\s*', '\n', text)
     text = re.sub(r'^\([123]\)\s*', '', text, flags=re.MULTILINE)
     
-    # Убираем лишние переносы строк
+    # Remove excessive line breaks
     text = re.sub(r'\n{3,}', '\n\n', text)
     
     return text.strip()
 
 
 def is_clarifying_question(text: str) -> bool:
-    """Определяет, является ли ответ уточняющим вопросом"""
-    # Считаем уточняющим только если вопросов много или ответ почти весь вопросами
+    """Determines if answer is a clarifying question"""
+    # Consider clarifying only if there are many questions or answer is mostly questions
     q_count = text.count("?")
     if q_count >= 2:
         return True
     
-    # Если один вопрос, но он занимает большую часть ответа
+    # If one question, but it takes up most of the answer
     if q_count == 1:
-        # Проверяем, что вопрос не в конце короткого ответа после предоставления информации
+        # Check that question is not at the end of a short answer after providing information
         text_lower = text.lower()
         clarifying_patterns = [
             r"to help (?:you|better|more|precisely)",
@@ -490,14 +490,14 @@ def is_clarifying_question(text: str) -> bool:
             r"какой|какая|какое",
         ]
         
-        # Если есть паттерны уточняющих вопросов И ответ короткий (< 50 слов)
-        # то это уточняющий вопрос
+        # If there are clarifying question patterns AND answer is short (< 50 words)
+        # then it's a clarifying question
         for pattern in clarifying_patterns:
             if re.search(pattern, text_lower):
                 if len(text.split()) < 50:
                     return True
         
-        # Если ответ очень короткий и состоит в основном из вопроса
+        # If answer is very short and mostly consists of a question
         if len(text.split()) < 20:
             return True
     
@@ -510,27 +510,27 @@ def determine_confidence_from_score(
     all_tool_calls: List[tuple],
     answer: str
 ) -> str:
-    """Определяет confidence на основе retrieval score"""
+    """Determines confidence based on retrieval score"""
     
-    # Если есть источники из KB и score нормальный — это НЕ Low, даже если есть 1 вопрос в конце
+    # If KB sources exist and score is normal — this is NOT Low, even if there's 1 question at the end
     if sources and top_score >= 0.3:
         if top_score > 0.6:
             return "High"
         return "Medium"
     
-    # Дальше — только если источников нет, тогда уточнения = Low
+    # Further — only if no sources, then clarifications = Low
     if is_clarifying_question(answer):
         return "Low"
     
-    # Если создан тикет и нет sources - Low
+    # If ticket created and no sources - Low
     if any(name == "create_ticket" for name, _, _ in all_tool_calls) and not sources:
         return "Low"
     
-    # Если есть sources, но низкий score - Medium
+    # If sources exist but low score - Medium
     if sources:
         return "Medium"
     
-    # По умолчанию Low
+    # Default Low
     return "Low"
 
 
@@ -557,13 +557,13 @@ def read_root():
     return FileResponse("static/index.html")
 
 
-# Подключение статических файлов (после определения маршрутов)
+# Mount static files (after defining routes)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 @app.get("/history")
 def get_history(thread_id: Optional[str] = None, limit: int = 20) -> Dict[str, Any]:
-    """Получить историю диалогов"""
+    """Get conversation history"""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
@@ -604,7 +604,7 @@ def get_history(thread_id: Optional[str] = None, limit: int = 20) -> Dict[str, A
 
 @app.get("/threads")
 def get_threads() -> Dict[str, Any]:
-    """Получить список всех thread ID"""
+    """Get list of all thread IDs"""
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
     
@@ -622,7 +622,7 @@ def get_threads() -> Dict[str, Any]:
 
 @app.post("/create-ticket")
 def create_ticket_endpoint(payload: CreateTicketIn) -> Dict[str, Any]:
-    """Создать тикет через API"""
+    """Create ticket via API"""
     try:
         ticket_info = create_ticket(
             title=payload.title,
@@ -630,7 +630,7 @@ def create_ticket_endpoint(payload: CreateTicketIn) -> Dict[str, Any]:
             priority=payload.priority
         )
         
-        # Логируем создание тикета
+        # Log ticket creation
         log_run(
             thread_id=payload.thread_id or "demo-thread",
             user_message=payload.description,
@@ -654,52 +654,52 @@ def chat(payload: ChatIn) -> Dict[str, Any]:
     user_msg = payload.message
     thread_id = payload.thread_id or "demo-thread"
 
-    # ВАЖНО: Retrieval теперь обязательный - всегда сначала ищем в KB
+    # IMPORTANT: Retrieval is now mandatory - always search KB first
     kb_results = search_kb(user_msg, limit=5)
     
-    # Фильтруем KB результаты по порогу релевантности
-    # Показываем только релевантные источники (score >= 0.25) и максимум 2 источника
-    KB_SCORE_THRESHOLD_RAW = 2.5  # Порог в raw score (примерно соответствует 0.25 в нормализованном)
+    # Filter KB results by relevance threshold
+    # Show only relevant sources (score >= 0.25) and maximum 2 sources
+    KB_SCORE_THRESHOLD_RAW = 2.5  # Threshold in raw score (approximately corresponds to 0.25 in normalized)
     kb_results_filtered = [x for x in kb_results if x.get("score", 0) >= KB_SCORE_THRESHOLD_RAW]
-    kb_results = kb_results_filtered[:2]  # Показываем максимум 2 источника
+    kb_results = kb_results_filtered[:2]  # Show maximum 2 sources
     
-    # Определяем top score для confidence из результатов search_kb
-    # Используем score, который уже учитывает переводы RU→EN и правильную логику подсчета
+    # Determine top score for confidence from search_kb results
+    # Use score that already accounts for RU→EN translations and correct calculation logic
     top_score = 0.0
     if kb_results:
-        # Берем score из первого (лучшего) результата
+        # Take score from first (best) result
         top_score_raw = kb_results[0].get("score", 0.0)
-        # Нормализуем score (примерно: score обычно от 0 до ~20-30, нормализуем к 0-1)
-        # Можно настроить коэффициент нормализации в зависимости от реальных значений score
+        # Normalize score (approximately: score usually from 0 to ~20-30, normalize to 0-1)
+        # Can adjust normalization coefficient depending on actual score values
         top_score = min(top_score_raw / 10.0, 1.0)
     
-    # КОНТРОЛЬ TICKET CREATION: определяем, может ли модель создавать тикеты
-    # Если KB найдена и score нормальный → отключаем tools (модель не может создать тикет)
-    # Если KB не найдена или низкий score → включаем tools (модель может вызвать create_ticket)
-    KB_SCORE_THRESHOLD = 0.2  # Порог релевантности (можно настроить)
+    # TICKET CREATION CONTROL: determine if model can create tickets
+    # If KB found and score is normal → disable tools (model cannot create ticket)
+    # If KB not found or low score → enable tools (model can call create_ticket)
+    KB_SCORE_THRESHOLD = 0.2  # Relevance threshold (can be adjusted)
     can_create_ticket = not kb_results or top_score < KB_SCORE_THRESHOLD
     
-    # Проверяем на повторяющиеся проблемы для автоматической эскалации
+    # Check for repeated issues for automatic escalation
     escalation_keywords = ["still", "again", "second time", "repeated", "still failing", "still not working"]
     is_repeated_issue = any(keyword in user_msg.lower() for keyword in escalation_keywords)
 
-    # Формируем промпт с результатами KB
+    # Build prompt with KB results
     kb_context = ""
     if kb_results:
         kb_context = "\n\nKnowledge Base Results:\n"
-        for idx, item in enumerate(kb_results[:3]):  # Показываем топ-3
+        for idx, item in enumerate(kb_results[:3]):  # Show top-3
             kb_context += f"{idx + 1}. [{item['title']}]\n"
             kb_context += f"   {item['snippet']}\n"
             kb_context += f"   URL: {item['url']}\n\n"
         
-        # Если это повторяющаяся проблема с оплатой, добавляем информацию об эскалации
+        # If this is a repeated payment issue, add escalation information
         if is_repeated_issue and any("payment" in item.get("id", "") or "billing" in item.get("id", "") for item in kb_results):
             kb_context += "\n⚠️ REPEATED ISSUE DETECTED: User mentioned 'still', 'again', or 'repeated'. "
             kb_context += "According to KB, repeated payment failures should be escalated to P1 priority ticket.\n"
     else:
         kb_context = "\n\nKnowledge Base Results: No relevant articles found.\n"
 
-    # Обновленный system prompt с ограничением домена
+    # Updated system prompt with domain restriction
     ticket_control_note = (
         "⚠️ TICKET CREATION CONTROL: " +
         ("You CAN create tickets via create_ticket tool (KB not found or low relevance)." if can_create_ticket 
@@ -767,13 +767,13 @@ def chat(payload: ChatIn) -> Dict[str, Any]:
         },
     ]
 
-    # Определяем, какие tools передавать модели
-    # Если KB найдена с хорошим score → отключаем tools (модель не может создать тикет)
-    # Если KB не найдена или низкий score → включаем tools (модель может создать тикет)
+    # Determine which tools to pass to model
+    # If KB found with good score → disable tools (model cannot create ticket)
+    # If KB not found or low score → enable tools (model can create ticket)
     tools_for_model = TOOLS if can_create_ticket else None
     tool_choice_for_model = "auto" if can_create_ticket else None
     
-    # Логируем запрос к OpenAI
+    # Log request to OpenAI
     print("\n" + "="*80)
     print("📤 REQUEST TO OPENAI API")
     print("="*80)
@@ -795,7 +795,7 @@ def chat(payload: ChatIn) -> Dict[str, Any]:
             tool_choice=tool_choice_for_model,
         )
         
-        # Логируем ответ от OpenAI
+        # Log response from OpenAI
         print("\n" + "="*80)
         print("📥 RESPONSE FROM OPENAI API")
         print("="*80)
@@ -809,29 +809,29 @@ def chat(payload: ChatIn) -> Dict[str, Any]:
                 print(f"  Tool call {i+1}: {tc.function.name}({tc.function.arguments[:100]}...)")
         print("="*80 + "\n")
 
-        # Теперь KB результаты уже получены, модель может вызвать только create_ticket
-        # (search_kb уже выполнен в backend)
+        # Now KB results are already obtained, model can only call create_ticket
+        # (search_kb already executed in backend)
         message = resp.choices[0].message
         tool_calls = message.tool_calls or []
 
         final_answer = message.content or ""
         all_tool_calls = []
-        max_iterations = 3  # Уменьшаем, так как search_kb уже выполнен
+        max_iterations = 3  # Reduced, as search_kb is already executed
         iteration = 0
 
-        # Обрабатываем tool calls (только create_ticket доступен, search_kb больше не в TOOLS)
+        # Process tool calls (only create_ticket available, search_kb no longer in TOOLS)
         while tool_calls and iteration < max_iterations:
             iteration += 1
             
-            # Добавляем ответ модели с tool calls в историю
+            # Add model response with tool calls to history
             messages.append(message)
             
-            # Выполняем tool calls (только create_ticket доступен, search_kb больше не в TOOLS)
+            # Execute tool calls (only create_ticket available, search_kb no longer in TOOLS)
             for tc in tool_calls:
                 name = tc.function.name
-                # search_kb больше не должен вызываться через tool calling (retrieval обязательный в backend)
+                # search_kb should no longer be called via tool calling (retrieval mandatory in backend)
                 if name == "search_kb":
-                    # Это не должно происходить, но на всякий случай используем уже полученные результаты
+                    # This shouldn't happen, but just in case use already obtained results
                     print(f"⚠️  Warning: Model tried to call search_kb, but it's no longer a tool. Using pre-fetched results.")
                     all_tool_calls.append(("search_kb", {"query": user_msg}, kb_results))
                     continue
@@ -849,8 +849,8 @@ def chat(payload: ChatIn) -> Dict[str, Any]:
                     }
                 )
 
-            # Получаем ответ после выполнения tool calls
-            # На последней итерации отключаем tools, чтобы модель обязательно вернула текст
+            # Get response after executing tool calls
+            # On last iteration disable tools to force model to return text
             print(f"\n🔄 ITERATION {iteration + 1}: Sending tool results back to OpenAI")
             print(f"Messages in context: {len(messages)}")
             print(f"Tool results: {len(all_tool_calls)} tools executed")
@@ -860,13 +860,13 @@ def chat(payload: ChatIn) -> Dict[str, Any]:
                 resp2 = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=messages,
-                    tools=None,  # Отключаем tools, чтобы получить текстовый ответ
+                    tools=None,  # Disable tools to get text response
                 )
             else:
                 resp2 = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=messages,
-                    tools=tools_for_model,  # Используем те же tools, что и в первом запросе
+                    tools=tools_for_model,  # Use same tools as in first request
                     tool_choice=tool_choice_for_model,
                 )
             
@@ -877,11 +877,11 @@ def chat(payload: ChatIn) -> Dict[str, Any]:
             final_answer = message.content or ""
             tool_calls = message.tool_calls or []
             
-            # Если получили текстовый ответ, выходим из цикла
+            # If got text response, exit loop
             if final_answer:
                 break
 
-        # Если ответ все еще пустой после всех итераций, формируем ответ на основе KB результатов
+        # If answer is still empty after all iterations, form answer based on KB results
         if not final_answer:
             ticket_info = None
             for name, args, result in all_tool_calls:
@@ -899,19 +899,19 @@ def chat(payload: ChatIn) -> Dict[str, Any]:
             else:
                 final_answer = "I couldn't find relevant information in the knowledge base. Please rephrase your question or create a support ticket."
 
-        # Добавляем search_kb в all_tool_calls если его там нет
+        # Add search_kb to all_tool_calls if it's not there
         if not any(name == "search_kb" for name, _, _ in all_tool_calls):
             all_tool_calls.insert(0, ("search_kb", {"query": user_msg}, kb_results))
         
-        # логируем (для резюме это очень жирно)
+        # Log (great for resume)
         for name, args, result in all_tool_calls:
             log_run(thread_id, user_msg, name, args, result, final_answer)
         
-        # Если tool calls не были вызваны, но ответ пустой
+        # If tool calls were not invoked but answer is empty
         if not all_tool_calls and not final_answer:
             final_answer = "Sorry, I couldn't form a response. Please try rephrasing your question."
 
-        # Структурируем ответ с использованием KB результатов и top_score
+        # Structure response using KB results and top_score
         structured_response = build_structured_response(
             final_answer=final_answer,
             all_tool_calls=all_tool_calls,
@@ -941,7 +941,7 @@ def chat(payload: ChatIn) -> Dict[str, Any]:
         traceback.print_exc()
         print("="*80 + "\n")
         
-        error_msg = f"Ошибка при обработке запроса: {str(e)}"
+        error_msg = f"Error processing request: {str(e)}"
         return {
             "answer": error_msg,
             "sources": [],
