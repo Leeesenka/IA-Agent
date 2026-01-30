@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KB Support Agent</title>
+    <link rel="stylesheet" href="/static/style.css?v=2">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <h1>KB Support Agent</h1>
+                <img src="/static/ai-agency-core-3d-icon-png-download-12002312.webp" alt="KB Support Agent" class="header-logo">
+            </div>
+            <p class="subtitle">AI-powered support assistant with knowledge base search</p>
+            <div class="header-buttons">
+                <button class="header-history-toggle" id="header-history-toggle" aria-label="Toggle history">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+                        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+                    </svg>
+                </button>
+                <button class="menu-toggle" id="menu-toggle" aria-label="Toggle menu">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <main>
+            <div class="chat-container">
+                <div id="chat-messages" class="chat-messages">
+                    <div class="welcome-message">
+                        <div class="message message-assistant">
+                            <div class="message-label">
+                                <img src="/static/icons8-бот-96.png" alt="Assistant" style="width: 48px; height: 48px; object-fit: contain;">
+                            </div>
+                            <div class="message-content">
+                                Hello! I'm an AI support assistant. Ask me a question, and I'll find the answer in the knowledge base or create a ticket.
+                                <div class="examples-section">
+                                    <p class="examples-label">Try asking:</p>
+                                    <div class="example-chips">
+                                        <button class="example-chip" onclick="insertExample('User signed up with Google. How can they change their password?')">User signed up with Google. How can they change their password?</button>
+                                        <button class="example-chip" onclick="insertExample('What to do if payment failed?')">What to do if payment failed?</button>
+                                        <button class="example-chip" onclick="insertExample('How to enable two-factor authentication?')">How to enable two-factor authentication?</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-input-container">
+                    <form id="chat-form" class="chat-form">
+                        <div class="input-wrapper">
+                            <textarea 
+                                id="message-input" 
+                                placeholder="Enter your question..." 
+                                rows="1"
+                                required
+                            ></textarea>
+                            <button type="submit" id="send-button" class="send-button">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                </svg>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="info-panel" id="info-panel">
+                <h3>Information</h3>
+                <div class="info-item">
+                    <strong>Thread ID:</strong>
+                    <div class="thread-id-wrapper">
+                        <span id="thread-id" class="thread-id-text">demo-thread</span>
+                        <button onclick="copyThreadId(event)" class="btn-copy" title="Copy Thread ID">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <button onclick="generateNewThread()" class="btn-small">New</button>
+                </div>
+                <div class="info-item">
+                    <strong>Status:</strong>
+                    <span id="status" class="status-badge status-ready">Ready</span>
+                </div>
+                <div class="info-item">
+                    <button class="btn-small" id="history-toggle">History</button>
+                </div>
+            </div>
+
+            <div id="history-overlay" class="history-overlay"></div>
+            <div id="history-panel" class="history-panel">
+                <div class="history-header">
+                    <h3>Chat History</h3>
+                    <button class="btn-close" id="history-close">✕</button>
+                </div>
+                <div class="history-controls">
+                    <select id="thread-select">
+                        <option value="">All threads</option>
+                    </select>
+                    <button class="btn-small" id="history-refresh">Refresh</button>
+                </div>
+                <div id="history-content" class="history-content">
+                    <p>Loading history...</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
+

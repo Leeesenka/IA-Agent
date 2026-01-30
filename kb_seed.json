@@ -1,0 +1,33 @@
+[
+  {
+    "id": "pw_reset",
+    "title": "Password reset",
+    "content": "If the user signed up with email+password: send reset link. If Google OAuth: password reset is not available. Ask to use Google sign-in.",
+    "url": "https://kb.local/password-reset"
+  },
+  {
+    "id": "billing_failed",
+    "title": "Payment failed",
+    "content": "Ask for invoice id, last 4 digits, and timestamp. Check gateway status page. If repeated failures: create ticket with priority P1.",
+    "url": "https://kb.local/billing-failed"
+  },
+  {
+    "id": "api_rate_limit",
+    "title": "API rate limits",
+    "content": "Free tier: 100 requests per hour. Pro tier: 1000 requests per hour. If exceeded, wait 1 hour or upgrade plan. Check usage in dashboard.",
+    "url": "https://kb.local/api-rate-limits"
+  },
+  {
+    "id": "account_deletion",
+    "title": "Account deletion",
+    "content": "Go to Settings > Account > Delete Account. All data will be permanently deleted within 30 days. Contact support if you need immediate deletion.",
+    "url": "https://kb.local/account-deletion"
+  },
+  {
+    "id": "two_factor_auth",
+    "title": "Two-factor authentication",
+    "content": "Enable 2FA in Settings > Security. Use authenticator app (Google Authenticator, Authy) or SMS. Backup codes are provided during setup.",
+    "url": "https://kb.local/two-factor-auth"
+  }
+]
+
